@@ -169,6 +169,24 @@
 
     function log(msg) {
       logEl.textContent = msg;
+      console.log(msg);
+    }
+
+    function toIsoString(timestamp, timestampMs) {
+      if (timestamp) {
+        const parsed = new Date(timestamp);
+        if (!isNaN(parsed.getTime())) return parsed.toISOString();
+      }
+
+      if (timestampMs) {
+        const ms = Number(timestampMs);
+        if (!isNaN(ms)) {
+          const parsed = new Date(ms);
+          if (!isNaN(parsed.getTime())) return parsed.toISOString();
+        }
+      }
+
+      return '';
     }
 
     function parseDateOnlyFromIso(isoString) {
@@ -198,6 +216,8 @@
         : '';
     }
 
+    console.log('Init app ready');
+
     fileInput.addEventListener('change', () => {
       const file = fileInput.files && fileInput.files[0];
       if (!file) {
@@ -209,6 +229,8 @@
         log('Ingen fil vald.');
         return;
       }
+
+      console.log('File selected', { name: file.name, size: file.size });
 
       const reader = new FileReader();
       reader.onload = e => {
@@ -239,6 +261,7 @@
     });
 
     function loadTripsFromData(data) {
+      console.log('Raw data keys', Object.keys(data || {}));
       const timelineObjects = data.timelineObjects || data.TimelineObjects || [];
       if (!Array.isArray(timelineObjects)) {
         log('Hittade inga "timelineObjects" i JSON-filen.');
@@ -249,13 +272,15 @@
       allTrips = [];
       let idCounter = 0;
 
+      console.log('Found timelineObjects', timelineObjects.length);
+
       for (const obj of timelineObjects) {
         const activity = obj.activitySegment;
         if (!activity) continue;
 
         const duration = activity.duration || {};
-        const startTs = duration.startTimestamp || '';
-        const endTs = duration.endTimestamp || '';
+        const startTs = toIsoString(duration.startTimestamp, duration.startTimestampMs);
+        const endTs = toIsoString(duration.endTimestamp, duration.endTimestampMs);
 
         const dateOnly = parseDateOnlyFromIso(startTs);
         const startTime = parseTimeOnlyFromIso(startTs);
@@ -288,6 +313,7 @@
         };
 
         allTrips.push(trip);
+        console.log('Parsed trip', trip);
       }
 
       if (allTrips.length === 0) {
@@ -313,6 +339,7 @@
         toDateInput.value = '';
       }
 
+      console.log('Total trips parsed', allTrips.length);
       applyFilter();
     }
 
@@ -326,6 +353,8 @@
         if (to && t.dateOnly > to) return false;
         return true;
       });
+
+      console.log('Applying filter', { from, to, kept: filteredTrips.length, total: allTrips.length });
 
       renderTripsTable();
       updateSummary();
