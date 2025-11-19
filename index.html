@@ -216,6 +216,18 @@
         : '';
     }
 
+    function parseLatLngString(latLngStr) {
+      if (typeof latLngStr !== 'string') return { lat: '', lng: '' };
+      const parts = latLngStr.split(',');
+      if (parts.length < 2) return { lat: '', lng: '' };
+
+      const clean = (s) => s.trim().replace(/°/g, '');
+      return {
+        lat: clean(parts[0]),
+        lng: clean(parts[1])
+      };
+    }
+
     console.log('Init app ready');
 
     fileInput.addEventListener('change', () => {
@@ -262,58 +274,107 @@
 
     function loadTripsFromData(data) {
       console.log('Raw data keys', Object.keys(data || {}));
-      const timelineObjects = data.timelineObjects || data.TimelineObjects || [];
-      if (!Array.isArray(timelineObjects)) {
-        log('Hittade inga "timelineObjects" i JSON-filen.');
-        controls.style.display = 'none';
-        return;
-      }
 
       allTrips = [];
       let idCounter = 0;
 
-      console.log('Found timelineObjects', timelineObjects.length);
+      const semanticSegments = Array.isArray(data.semanticSegments) ? data.semanticSegments : null;
 
-      for (const obj of timelineObjects) {
-        const activity = obj.activitySegment;
-        if (!activity) continue;
+      if (semanticSegments) {
+        console.log('Found semanticSegments', semanticSegments.length);
 
-        const duration = activity.duration || {};
-        const startTs = toIsoString(duration.startTimestamp, duration.startTimestampMs);
-        const endTs = toIsoString(duration.endTimestamp, duration.endTimestampMs);
+        for (const segment of semanticSegments) {
+          const activity = segment.activity;
+          if (!activity) continue;
 
-        const dateOnly = parseDateOnlyFromIso(startTs);
-        const startTime = parseTimeOnlyFromIso(startTs);
-        const endTime = parseTimeOnlyFromIso(endTs);
+          const startTs = segment.startTime || '';
+          const endTs = segment.endTime || '';
 
-        const distanceM = activity.distance;
-        const distanceKm =
-          (distanceM !== undefined && distanceM !== null)
-            ? (distanceM / 1000).toFixed(3)
-            : '';
+          const dateOnly = parseDateOnlyFromIso(startTs);
+          const startTime = parseTimeOnlyFromIso(startTs);
+          const endTime = parseTimeOnlyFromIso(endTs);
 
-        const startLoc = activity.startLocation || {};
-        const endLoc = activity.endLocation || {};
+          const distanceM =
+            activity.distanceMeters !== undefined && activity.distanceMeters !== null
+              ? activity.distanceMeters
+              : activity.distance;
+          const distanceKm =
+            (distanceM !== undefined && distanceM !== null)
+              ? (Number(distanceM) / 1000).toFixed(3)
+              : '';
 
-        const trip = {
-          id: idCounter++,
-          startTimestamp: startTs,
-          endTimestamp: endTs,
-          dateOnly: dateOnly,
-          startTime: startTime,
-          endTime: endTime,
-          distanceKm: distanceKm,
-          startLat: coordToDeg(startLoc.latitudeE7),
-          startLng: coordToDeg(startLoc.longitudeE7),
-          endLat: coordToDeg(endLoc.latitudeE7),
-          endLng: coordToDeg(endLoc.longitudeE7),
-          startAddress: startLoc.address || '',
-          endAddress: endLoc.address || '',
-          selected: true // default: allt markerat
-        };
+          const startCoords = parseLatLngString(activity.start && activity.start.latLng);
+          const endCoords = parseLatLngString(activity.end && activity.end.latLng);
 
-        allTrips.push(trip);
-        console.log('Parsed trip', trip);
+          const trip = {
+            id: idCounter++,
+            startTimestamp: startTs,
+            endTimestamp: endTs,
+            dateOnly: dateOnly,
+            startTime: startTime,
+            endTime: endTime,
+            distanceKm: distanceKm,
+            startLat: startCoords.lat,
+            startLng: startCoords.lng,
+            endLat: endCoords.lat,
+            endLng: endCoords.lng,
+            startAddress: '',
+            endAddress: '',
+            selected: true
+          };
+
+          allTrips.push(trip);
+          console.log('Parsed semantic trip', trip);
+        }
+      }
+
+      if (!semanticSegments || allTrips.length === 0) {
+        const timelineObjects = data.timelineObjects || data.TimelineObjects || [];
+        if (Array.isArray(timelineObjects)) {
+          console.log('Found timelineObjects', timelineObjects.length);
+
+          for (const obj of timelineObjects) {
+            const activity = obj.activitySegment;
+            if (!activity) continue;
+
+            const duration = activity.duration || {};
+            const startTs = toIsoString(duration.startTimestamp, duration.startTimestampMs);
+            const endTs = toIsoString(duration.endTimestamp, duration.endTimestampMs);
+
+            const dateOnly = parseDateOnlyFromIso(startTs);
+            const startTime = parseTimeOnlyFromIso(startTs);
+            const endTime = parseTimeOnlyFromIso(endTs);
+
+            const distanceM = activity.distance;
+            const distanceKm =
+              (distanceM !== undefined && distanceM !== null)
+                ? (distanceM / 1000).toFixed(3)
+                : '';
+
+            const startLoc = activity.startLocation || {};
+            const endLoc = activity.endLocation || {};
+
+            const trip = {
+              id: idCounter++,
+              startTimestamp: startTs,
+              endTimestamp: endTs,
+              dateOnly: dateOnly,
+              startTime: startTime,
+              endTime: endTime,
+              distanceKm: distanceKm,
+              startLat: coordToDeg(startLoc.latitudeE7),
+              startLng: coordToDeg(startLoc.longitudeE7),
+              endLat: coordToDeg(endLoc.latitudeE7),
+              endLng: coordToDeg(endLoc.longitudeE7),
+              startAddress: startLoc.address || '',
+              endAddress: endLoc.address || '',
+              selected: true // default: allt markerat
+            };
+
+            allTrips.push(trip);
+            console.log('Parsed legacy trip', trip);
+          }
+        }
       }
 
       if (allTrips.length === 0) {
