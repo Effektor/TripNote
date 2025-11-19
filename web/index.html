@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Körjournal från Google Timeline</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 1000px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.5;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 0.5rem;
+    }
+    .card {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      background: #fafafa;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-weight: 600;
+    }
+    input[type="file"] {
+      display: block;
+      margin-bottom: 1rem;
+    }
+    button {
+      padding: 0.4rem 0.9rem;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #444;
+      color: #fff;
+      font-size: 0.95rem;
+      cursor: pointer;
+      margin-right: 0.4rem;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .log {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      background: #f5f5f5;
+      padding: 0.5rem;
+      border-radius: 4px;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-top: 0.5rem;
+      align-items: flex-end;
+    }
+    .filters > div {
+      min-width: 140px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 0.35rem 0.4rem;
+      vertical-align: top;
+    }
+    th {
+      background: #eee;
+    }
+    td.small {
+      white-space: nowrap;
+    }
+    .summary {
+      margin-top: 0.25rem;
+      font-size: 0.85rem;
+    }
+    @media (max-width: 700px) {
+      table {
+        font-size: 0.75rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Körjournal från Google Maps Timeline</h1>
+  <p>
+    Allt sker lokalt i webbläsaren. Din JSON-fil lämnar aldrig din dator.
+  </p>
+
+  <!-- File and basic controls -->
+  <div class="card">
+    <label for="fileInput">Välj din Google Timeline JSON-fil</label>
+    <input id="fileInput" type="file" accept=".json">
+
+    <div id="controls" style="display:none;">
+      <div class="filters">
+        <div>
+          <label for="fromDate">Från datum</label>
+          <input type="date" id="fromDate">
+        </div>
+        <div>
+          <label for="toDate">Till datum</label>
+          <input type="date" id="toDate">
+        </div>
+        <div>
+          <button id="applyFilterBtn">Filtrera</button>
+        </div>
+        <div>
+          <button id="selectVisibleBtn">Markera synliga</button>
+          <button id="clearVisibleBtn">Avmarkera synliga</button>
+        </div>
+        <div>
+          <button id="exportBtn">Exportera valda till CSV</button>
+        </div>
+      </div>
+
+      <div class="summary" id="summary"></div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Välj</th>
+              <th>Datum</th>
+              <th>Starttid</th>
+              <th>Sluttid</th>
+              <th>Sträcka (km)</th>
+              <th>Från</th>
+              <th>Till</th>
+            </tr>
+          </thead>
+          <tbody id="tripsBody">
+            <!-- trips go here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="log" id="log">Ingen fil vald.</div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const logEl = document.getElementById('log');
+    const controls = document.getElementById('controls');
+    const tripsBody = document.getElementById('tripsBody');
+    const summaryEl = document.getElementById('summary');
+
+    const fromDateInput = document.getElementById('fromDate');
+    const toDateInput = document.getElementById('toDate');
+    const applyFilterBtn = document.getElementById('applyFilterBtn');
+    const selectVisibleBtn = document.getElementById('selectVisibleBtn');
+    const clearVisibleBtn = document.getElementById('clearVisibleBtn');
+    const exportBtn = document.getElementById('exportBtn');
+
+    let allTrips = [];      // alla resor
+    let filteredTrips = []; // resor efter datumfilter
+
+    function log(msg) {
+      logEl.textContent = msg;
+    }
+
+    function parseDateOnlyFromIso(isoString) {
+      // isoString: "2024-01-01T08:30:00Z" etc.
+      if (!isoString) return '';
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      // YYYY-MM-DD in local time
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function parseTimeOnlyFromIso(isoString) {
+      if (!isoString) return '';
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+
+    function coordToDeg(c) {
+      return (c !== undefined && c !== null)
+        ? (c / 1e7).toFixed(7)
+        : '';
+    }
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        allTrips = [];
+        filteredTrips = [];
+        controls.style.display = 'none';
+        tripsBody.innerHTML = '';
+        summaryEl.textContent = '';
+        log('Ingen fil vald.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const text = e.target.result;
+          const data = JSON.parse(text);
+          loadTripsFromData(data);
+          log(`Fil laddad: ${file.name}`);
+        } catch (err) {
+          console.error(err);
+          allTrips = [];
+          filteredTrips = [];
+          controls.style.display = 'none';
+          tripsBody.innerHTML = '';
+          summaryEl.textContent = '';
+          log('Fel vid tolkning av JSON-filen. Är det rätt exportfil?');
+        }
+      };
+      reader.onerror = () => {
+        allTrips = [];
+        filteredTrips = [];
+        controls.style.display = 'none';
+        tripsBody.innerHTML = '';
+        summaryEl.textContent = '';
+        log('Kunde inte läsa filen.');
+      };
+      reader.readAsText(file, 'utf-8');
+    });
+
+    function loadTripsFromData(data) {
+      const timelineObjects = data.timelineObjects || data.TimelineObjects || [];
+      if (!Array.isArray(timelineObjects)) {
+        log('Hittade inga "timelineObjects" i JSON-filen.');
+        controls.style.display = 'none';
+        return;
+      }
+
+      allTrips = [];
+      let idCounter = 0;
+
+      for (const obj of timelineObjects) {
+        const activity = obj.activitySegment;
+        if (!activity) continue;
+
+        const duration = activity.duration || {};
+        const startTs = duration.startTimestamp || '';
+        const endTs = duration.endTimestamp || '';
+
+        const dateOnly = parseDateOnlyFromIso(startTs);
+        const startTime = parseTimeOnlyFromIso(startTs);
+        const endTime = parseTimeOnlyFromIso(endTs);
+
+        const distanceM = activity.distance;
+        const distanceKm =
+          (distanceM !== undefined && distanceM !== null)
+            ? (distanceM / 1000).toFixed(3)
+            : '';
+
+        const startLoc = activity.startLocation || {};
+        const endLoc = activity.endLocation || {};
+
+        const trip = {
+          id: idCounter++,
+          startTimestamp: startTs,
+          endTimestamp: endTs,
+          dateOnly: dateOnly,
+          startTime: startTime,
+          endTime: endTime,
+          distanceKm: distanceKm,
+          startLat: coordToDeg(startLoc.latitudeE7),
+          startLng: coordToDeg(startLoc.longitudeE7),
+          endLat: coordToDeg(endLoc.latitudeE7),
+          endLng: coordToDeg(endLoc.longitudeE7),
+          startAddress: startLoc.address || '',
+          endAddress: endLoc.address || '',
+          selected: true // default: allt markerat
+        };
+
+        allTrips.push(trip);
+      }
+
+      if (allTrips.length === 0) {
+        controls.style.display = 'none';
+        tripsBody.innerHTML = '';
+        summaryEl.textContent = '';
+        log('Inga activitySegment (resor) hittades i filen.');
+        return;
+      }
+
+      controls.style.display = 'block';
+
+      // sätt datumfilter automatiskt till min/max datum
+      const dates = allTrips
+        .map(t => t.dateOnly)
+        .filter(d => d !== '')
+        .sort();
+      if (dates.length > 0) {
+        fromDateInput.value = dates[0];
+        toDateInput.value = dates[dates.length - 1];
+      } else {
+        fromDateInput.value = '';
+        toDateInput.value = '';
+      }
+
+      applyFilter();
+    }
+
+    function applyFilter() {
+      const from = fromDateInput.value;
+      const to = toDateInput.value;
+
+      filteredTrips = allTrips.filter(t => {
+        if (!t.dateOnly) return false;
+        if (from && t.dateOnly < from) return false;
+        if (to && t.dateOnly > to) return false;
+        return true;
+      });
+
+      renderTripsTable();
+      updateSummary();
+    }
+
+    function renderTripsTable() {
+      tripsBody.innerHTML = '';
+
+      for (const trip of filteredTrips) {
+        const tr = document.createElement('tr');
+
+        // checkbox
+        const tdCheck = document.createElement('td');
+        tdCheck.className = 'small';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!trip.selected;
+        cb.dataset.tripId = String(trip.id);
+        cb.addEventListener('change', () => {
+          trip.selected = cb.checked;
+          updateSummary();
+        });
+        tdCheck.appendChild(cb);
+        tr.appendChild(tdCheck);
+
+        // date
+        const tdDate = document.createElement('td');
+        tdDate.className = 'small';
+        tdDate.textContent = trip.dateOnly;
+        tr.appendChild(tdDate);
+
+        // start time
+        const tdStart = document.createElement('td');
+        tdStart.className = 'small';
+        tdStart.textContent = trip.startTime;
+        tr.appendChild(tdStart);
+
+        // end time
+        const tdEnd = document.createElement('td');
+        tdEnd.className = 'small';
+        tdEnd.textContent = trip.endTime;
+        tr.appendChild(tdEnd);
+
+        // distance
+        const tdDist = document.createElement('td');
+        tdDist.className = 'small';
+        tdDist.textContent = trip.distanceKm;
+        tr.appendChild(tdDist);
+
+        // from addr
+        const tdFrom = document.createElement('td');
+        tdFrom.textContent = trip.startAddress;
+        tr.appendChild(tdFrom);
+
+        // to addr
+        const tdTo = document.createElement('td');
+        tdTo.textContent = trip.endAddress;
+        tr.appendChild(tdTo);
+
+        tripsBody.appendChild(tr);
+      }
+    }
+
+    function updateSummary() {
+      const totalTrips = allTrips.length;
+      const filteredCount = filteredTrips.length;
+      const selectedInFiltered = filteredTrips.filter(t => t.selected).length;
+      const selectedTotal = allTrips.filter(t => t.selected).length;
+
+      let totalDistSelected = 0;
+      for (const t of allTrips) {
+        if (t.selected && t.distanceKm) {
+          const n = Number(t.distanceKm.replace(',', '.'));
+          if (!isNaN(n)) totalDistSelected += n;
+        }
+      }
+
+      summaryEl.textContent =
+        `Totalt antal resor: ${totalTrips}. ` +
+        `Visas efter filter: ${filteredCount}. ` +
+        `Markerade i filtret: ${selectedInFiltered}. ` +
+        `Markerade totalt: ${selectedTotal}. ` +
+        `Summa sträcka (markerade): ${totalDistSelected.toFixed(1)} km.`;
+    }
+
+    applyFilterBtn.addEventListener('click', () => {
+      applyFilter();
+    });
+
+    selectVisibleBtn.addEventListener('click', () => {
+      for (const t of filteredTrips) {
+        t.selected = true;
+      }
+      renderTripsTable();
+      updateSummary();
+    });
+
+    clearVisibleBtn.addEventListener('click', () => {
+      for (const t of filteredTrips) {
+        t.selected = false;
+      }
+      renderTripsTable();
+      updateSummary();
+    });
+
+    exportBtn.addEventListener('click', () => {
+      const rows = [];
+
+      // exportera endast markerade (oavsett om de syns i aktuellt filter)
+      const selectedTrips = allTrips.filter(t => t.selected);
+      if (selectedTrips.length === 0) {
+        log('Inga resor är markerade för export.');
+        return;
+      }
+
+      const headers = [
+        'StartTime',
+        'EndTime',
+        'Distance_km',
+        'StartLat',
+        'StartLng',
+        'EndLat',
+        'EndLng',
+        'StartAddress',
+        'EndAddress'
+      ];
+
+      for (const t of selectedTrips) {
+        const row = [
+          t.startTimestamp,
+          t.endTimestamp,
+          t.distanceKm,
+          t.startLat,
+          t.startLng,
+          t.endLat,
+          t.endLng,
+          t.startAddress,
+          t.endAddress
+        ];
+        rows.push(row);
+      }
+
+      const csv = buildCsv(headers, rows);
+      downloadCsv(csv, 'korjournal.csv');
+      log(`Export klar. Antal resor i filen: ${selectedTrips.length}.`);
+    });
+
+    function buildCsv(headers, rows) {
+      const allRows = [];
+      allRows.push(headers.map(csvEscape).join(','));
+      for (const r of rows) {
+        allRows.push(r.map(csvEscape).join(','));
+      }
+      return allRows.join('\r\n');
+    }
+
+    function csvEscape(value) {
+      let v = value == null ? '' : String(value);
+      if (v.includes('"')) {
+        v = v.replace(/"/g, '""');
+      }
+      return `"${v}"`;
+    }
+
+    function downloadCsv(csvText, filename) {
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
