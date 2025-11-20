@@ -215,6 +215,10 @@
     .trip-coord-value {
       color: #2c3e50;
     }
+    .trip-coord-copyable {
+      cursor: pointer;
+      text-decoration: underline dotted;
+    }
     .trip-place {
       display: flex;
       align-items: center;
@@ -451,6 +455,56 @@
       if (isNaN(nLat) || isNaN(nLng)) return '';
       // round to 4 decimals to make close coordinates match the same place
       return `${nLat.toFixed(4)},${nLng.toFixed(4)}`;
+    }
+
+    function copyCoordsToClipboard(lat, lng) {
+      const coordsText = formatLatLngForDisplay(lat, lng);
+      if (!coordsText) {
+        log('Inga koordinater att kopiera.');
+        return;
+      }
+
+      const fallbackCopy = () => {
+        const textarea = document.createElement('textarea');
+        textarea.value = coordsText;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          log(`Kopierade koordinater: ${coordsText}`);
+        } catch (e) {
+          console.warn('Clipboard copy failed', e);
+          log('Kunde inte kopiera koordinater.');
+        }
+        document.body.removeChild(textarea);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(coordsText)
+          .then(() => log(`Kopierade koordinater: ${coordsText}`))
+          .catch((err) => {
+            console.warn('Clipboard copy failed, falling back', err);
+            fallbackCopy();
+          });
+      } else {
+        fallbackCopy();
+      }
+    }
+
+    function attachCoordCopyHandler(el, lat, lng) {
+      if (!el) return;
+      const coordsText = formatLatLngForDisplay(lat, lng);
+      if (!coordsText) return;
+      el.classList.add('trip-coord-copyable');
+      const existingTitle = el.title || '';
+      const copyHint = `Klicka för att kopiera ${coordsText}`;
+      el.title = existingTitle ? `${existingTitle} – ${copyHint}` : copyHint;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copyCoordsToClipboard(lat, lng);
+      });
     }
 
     function loadPlaceNameMap() {
@@ -881,6 +935,7 @@
         fromCoord.appendChild(fromLabel);
         fromCoord.appendChild(fromValue);
         coordsDiv.appendChild(fromCoord);
+        attachCoordCopyHandler(fromValue, trip.startLat, trip.startLng);
 
         // To coordinates
         const toCoord = document.createElement('div');
@@ -895,6 +950,7 @@
         toCoord.appendChild(toLabel);
         toCoord.appendChild(toValue);
         coordsDiv.appendChild(toCoord);
+        attachCoordCopyHandler(toValue, trip.endLat, trip.endLng);
 
         row2.appendChild(coordsDiv);
 
