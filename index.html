@@ -4,46 +4,65 @@
   <meta charset="UTF-8">
   <title>Körjournal från Google Timeline</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      max-width: 1000px;
+      max-width: 1400px;
       margin: 2rem auto;
       padding: 0 1rem;
       line-height: 1.5;
+      background: #f8f9fa;
     }
     h1 {
       font-size: 1.6rem;
       margin-bottom: 0.5rem;
+      color: #2c3e50;
     }
     .card {
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 1rem;
+      border: none;
+      border-radius: 12px;
+      padding: 1.25rem;
       margin-top: 1rem;
-      background: #fafafa;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     label {
       display: block;
       margin-bottom: 0.25rem;
       font-weight: 600;
+      color: #495057;
     }
     input[type="file"] {
       display: block;
       margin-bottom: 1rem;
+      padding: 0.5rem;
+      border: 2px dashed #dee2e6;
+      border-radius: 8px;
+      width: 100%;
+      cursor: pointer;
+    }
+    input[type="date"] {
+      padding: 0.5rem;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      font-size: 0.9rem;
     }
     button {
-      padding: 0.4rem 0.9rem;
-      border-radius: 4px;
-      border: 1px solid #444;
-      background: #444;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      border: none;
+      background: #495057;
       color: #fff;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       cursor: pointer;
       margin-right: 0.4rem;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button:hover:not(:disabled) {
+      background: #343a40;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
     button:disabled {
       opacity: 0.5;
@@ -53,9 +72,10 @@
       margin-top: 0.5rem;
       font-size: 0.85rem;
       white-space: pre-wrap;
-      background: #f5f5f5;
-      padding: 0.5rem;
-      border-radius: 4px;
+      background: #f8f9fa;
+      padding: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
     }
     .filters {
       display: flex;
@@ -67,31 +87,213 @@
     .filters > div {
       min-width: 140px;
     }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 0.75rem;
+    .summary {
+      margin-top: 0.5rem;
       font-size: 0.85rem;
+      color: #6c757d;
+      padding: 0.75rem;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #e9ecef;
     }
-    th, td {
-      border: 1px solid #ddd;
-      padding: 0.35rem 0.4rem;
-      vertical-align: top;
+    
+    /* Trip card styles */
+    .trips-container {
+      margin-top: 0.75rem;
     }
-    th {
-      background: #eee;
+    .trip-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.35rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 2px solid #e9ecef;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+      display: flex;
+      gap: 0.75rem;
+      align-items: stretch;
     }
-    td.small {
+    .trip-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .trip-card.selected {
+      background: linear-gradient(135deg, #d4edda 0%, #e8f5e9 100%);
+      border-color: #c3e6cb;
+    }
+    .trip-card.unselected {
+      background: linear-gradient(135deg, #f8d7da 0%, #ffe5e5 100%);
+      border-color: #f5c6cb;
+    }
+    .trip-check-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      align-self: center;
+    }
+    .trip-card.selected .trip-check-icon {
+      background: #28a745;
+      color: white;
+    }
+    .trip-card.unselected .trip-check-icon {
+      background: #dc3545;
+      color: white;
+    }
+    .trip-card-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      min-width: 0;
+    }
+    .trip-row-1 {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 0.8rem;
+    }
+    .trip-date {
+      font-weight: 600;
+      color: #2c3e50;
+      font-size: 0.85rem;
       white-space: nowrap;
     }
-    .summary {
-      margin-top: 0.25rem;
-      font-size: 0.85rem;
+    .trip-time {
+      color: #6c757d;
+      font-size: 0.8rem;
+      white-space: nowrap;
     }
+    .trip-type {
+      background: #d1ecf1;
+      color: #0c5460;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .trip-distance {
+      background: #fff3cd;
+      color: #856404;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .trip-row-2 {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.75rem;
+    }
+    .trip-coordinates {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .trip-coord-item {
+      display: flex;
+      gap: 0.3rem;
+      align-items: baseline;
+      white-space: nowrap;
+    }
+    .trip-coord-label {
+      font-weight: 600;
+      color: #6c757d;
+    }
+    .trip-coord-value {
+      color: #2c3e50;
+    }
+    .trip-place {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .trip-place-tag {
+      background: #d4edda;
+      color: #155724;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .trip-place-tag:hover {
+      background: #c3e6cb;
+    }
+
+    
     @media (max-width: 700px) {
-      table {
-        font-size: 0.75rem;
+      .trip-date-time {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
       }
+    }
+    
+    /* Modal styles */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+    .modal-header {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: #2c3e50;
+    }
+    .modal-body {
+      margin-bottom: 1rem;
+    }
+    .modal-body input {
+      width: 100%;
+      padding: 0.6rem;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+    .modal-footer {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+    .modal-footer button {
+      margin: 0;
     }
   </style>
 </head>
@@ -130,41 +332,33 @@
 
       <div class="summary" id="summary"></div>
 
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Välj</th>
-              <th>Datum</th>
-              <th>Starttid</th>
-              <th>Sluttid</th>
-              <th>Typ</th>
-              <th>Platsnamn</th>
-              <th>Sträcka (km)</th>
-              <th>Från</th>
-              <th>Till</th>
-            </tr>
-          </thead>
-          <tbody id="tripsBody">
-            <!-- trips go here -->
-          </tbody>
-        </table>
+      <div class="trips-container" id="tripsContainer">
+        <!-- trip cards go here -->
       </div>
     </div>
 
     <div class="log" id="log">Ingen fil vald.</div>
   </div>
 
-  <div id="placeDialog" title="Namnge placeId" style="display:none;">
-    <div id="placeDialogId" style="font-size:0.9rem; margin-bottom:0.3rem;"></div>
-    <input type="text" id="placeDialogInput" style="width:100%; padding:0.3rem;" placeholder="Ange namn eller lämna tomt för att ta bort">
+  <div id="placeDialog" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">Namnge placeId</div>
+      <div class="modal-body">
+        <div id="placeDialogId" style="font-size:0.85rem; color: #6c757d; margin-bottom:0.5rem;"></div>
+        <input type="text" id="placeDialogInput" placeholder="Ange namn eller lämna tomt för att ta bort">
+      </div>
+      <div class="modal-footer">
+        <button id="placeDialogCancel">Avbryt</button>
+        <button id="placeDialogSave">Spara</button>
+      </div>
+    </div>
   </div>
 
   <script>
     const fileInput = document.getElementById('fileInput');
     const logEl = document.getElementById('log');
     const controls = document.getElementById('controls');
-    const tripsBody = document.getElementById('tripsBody');
+    const tripsContainer = document.getElementById('tripsContainer');
     const summaryEl = document.getElementById('summary');
 
     const fromDateInput = document.getElementById('fromDate');
@@ -177,9 +371,12 @@
     let allTrips = [];      // alla resor
     let filteredTrips = []; // resor efter datumfilter
     let placeNameMap = loadPlaceNameMap();
-    let placeDialog = null;
+    let placeDialogEl = null;
     let placeDialogInput = null;
     let placeDialogIdEl = null;
+    let placeDialogSave = null;
+    let placeDialogCancel = null;
+    let currentPlaceIdToEdit = '';
     let visitByStartTime = {};
 
     function log(msg) {
@@ -305,26 +502,33 @@
     }
 
     function promptForPlaceName(placeId) {
-      if (!placeId || !placeDialog) return;
+      if (!placeId || !placeDialogEl) return;
+      currentPlaceIdToEdit = placeId;
       placeDialogIdEl.textContent = placeId;
       placeDialogInput.value = placeNameMap[placeId] || '';
-      placeDialog.dialog('option', 'buttons', {
-        Spara: () => {
-          const trimmed = placeDialogInput.value.trim();
-          if (trimmed) {
-            placeNameMap[placeId] = trimmed;
-          } else {
-            delete placeNameMap[placeId];
-          }
-          savePlaceNameMap();
-          applyPlaceNamesToTrips();
-          renderTripsTable();
-          updateSummary();
-          placeDialog.dialog('close');
-        },
-        Avbryt: () => placeDialog.dialog('close')
-      });
-      placeDialog.dialog('open');
+      placeDialogEl.classList.add('active');
+      placeDialogInput.focus();
+    }
+
+    function closePlaceDialog() {
+      if (placeDialogEl) {
+        placeDialogEl.classList.remove('active');
+        currentPlaceIdToEdit = '';
+      }
+    }
+
+    function savePlaceName() {
+      const trimmed = placeDialogInput.value.trim();
+      if (trimmed) {
+        placeNameMap[currentPlaceIdToEdit] = trimmed;
+      } else {
+        delete placeNameMap[currentPlaceIdToEdit];
+      }
+      savePlaceNameMap();
+      applyPlaceNamesToTrips();
+      renderTripsTable();
+      updateSummary();
+      closePlaceDialog();
     }
 
     console.log('Init app ready');
@@ -335,7 +539,7 @@
         allTrips = [];
         filteredTrips = [];
         controls.style.display = 'none';
-        tripsBody.innerHTML = '';
+        tripsContainer.innerHTML = '';
         summaryEl.textContent = '';
         log('Ingen fil vald.');
         return;
@@ -355,7 +559,7 @@
           allTrips = [];
           filteredTrips = [];
           controls.style.display = 'none';
-          tripsBody.innerHTML = '';
+          tripsContainer.innerHTML = '';
           summaryEl.textContent = '';
           log('Fel vid tolkning av JSON-filen. Är det rätt exportfil?');
         }
@@ -364,7 +568,7 @@
         allTrips = [];
         filteredTrips = [];
         controls.style.display = 'none';
-        tripsBody.innerHTML = '';
+        tripsContainer.innerHTML = '';
         summaryEl.textContent = '';
         log('Kunde inte läsa filen.');
       };
@@ -543,7 +747,7 @@
 
       if (allTrips.length === 0) {
         controls.style.display = 'none';
-        tripsBody.innerHTML = '';
+        tripsContainer.innerHTML = '';
         summaryEl.textContent = '';
         log('Inga activitySegment (resor) hittades i filen.');
         return;
@@ -587,78 +791,137 @@
     }
 
     function renderTripsTable() {
-      tripsBody.innerHTML = '';
+      tripsContainer.innerHTML = '';
 
       for (const trip of filteredTrips) {
-        const tr = document.createElement('tr');
+        const card = document.createElement('div');
+        card.className = 'trip-card';
+        card.className += trip.selected ? ' selected' : ' unselected';
+        card.dataset.tripId = String(trip.id);
 
-        // checkbox
-        const tdCheck = document.createElement('td');
-        tdCheck.className = 'small';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = !!trip.selected;
-        cb.dataset.tripId = String(trip.id);
-        cb.addEventListener('change', () => {
-          trip.selected = cb.checked;
+        // Make the whole card clickable to toggle selection
+        card.addEventListener('click', (e) => {
+          // Don't toggle if clicking on the place tag
+          if (e.target.classList.contains('trip-place-tag')) {
+            return;
+          }
+          trip.selected = !trip.selected;
+          card.className = 'trip-card' + (trip.selected ? ' selected' : ' unselected');
           updateSummary();
         });
-        tdCheck.appendChild(cb);
-        tr.appendChild(tdCheck);
 
-        // date
-        const tdDate = document.createElement('td');
-        tdDate.className = 'small';
-        tdDate.textContent = trip.dateOnly;
-        tr.appendChild(tdDate);
+        // Check icon (left side)
+        const checkIcon = document.createElement('div');
+        checkIcon.className = 'trip-check-icon';
+        checkIcon.textContent = trip.selected ? '✓' : '✕';
+        card.appendChild(checkIcon);
 
-        // start time
-        const tdStart = document.createElement('td');
-        tdStart.className = 'small';
-        tdStart.textContent = trip.startTime;
-        tr.appendChild(tdStart);
+        // Main content area
+        const content = document.createElement('div');
+        content.className = 'trip-card-content';
 
-        // end time
-        const tdEnd = document.createElement('td');
-        tdEnd.className = 'small';
-        tdEnd.textContent = trip.endTime;
-        tr.appendChild(tdEnd);
+        // Row 1: Date, start time, end time, transport mode, distance
+        const row1 = document.createElement('div');
+        row1.className = 'trip-row-1';
 
-        // trip type
-        const tdType = document.createElement('td');
-        tdType.className = 'small';
-        tdType.textContent = trip.tripType || '';
-        tr.appendChild(tdType);
+        // Date
+        const dateSpan = document.createElement('span');
+        dateSpan.className = 'trip-date';
+        dateSpan.textContent = trip.dateOnly;
+        row1.appendChild(dateSpan);
 
-        // place names
-        const tdPlace = document.createElement('td');
-        tdPlace.className = 'small';
-        tdPlace.textContent = formatPlaceNames(trip);
-        if (trip.placeIdAfter) {
-          tdPlace.style.cursor = 'pointer';
-          tdPlace.title = 'Klicka för att namnge placeId';
-          const pidToEdit = placeIdForEdit(trip);
-          tdPlace.addEventListener('click', () => promptForPlaceName(pidToEdit));
+        // Start time
+        const startTime = document.createElement('span');
+        startTime.className = 'trip-time';
+        startTime.textContent = trip.startTime;
+        row1.appendChild(startTime);
+
+        // End time
+        const endTime = document.createElement('span');
+        endTime.className = 'trip-time';
+        endTime.textContent = trip.endTime;
+        row1.appendChild(endTime);
+
+        // Transport mode
+        if (trip.tripType) {
+          const typeSpan = document.createElement('span');
+          typeSpan.className = 'trip-type';
+          typeSpan.textContent = trip.tripType;
+          row1.appendChild(typeSpan);
         }
-        tr.appendChild(tdPlace);
 
-        // distance
-        const tdDist = document.createElement('td');
-        tdDist.className = 'small';
-        tdDist.textContent = trip.distanceKm;
-        tr.appendChild(tdDist);
+        // Distance
+        if (trip.distanceKm) {
+          const distSpan = document.createElement('span');
+          distSpan.className = 'trip-distance';
+          distSpan.textContent = `${trip.distanceKm} km`;
+          row1.appendChild(distSpan);
+        }
 
-        // from addr
-        const tdFrom = document.createElement('td');
-        tdFrom.textContent = trip.startAddress;
-        tr.appendChild(tdFrom);
+        content.appendChild(row1);
 
-        // to addr
-        const tdTo = document.createElement('td');
-        tdTo.textContent = trip.endAddress;
-        tr.appendChild(tdTo);
+        // Row 2: Coordinates (From/To) and PlaceId/Platsnamn
+        const row2 = document.createElement('div');
+        row2.className = 'trip-row-2';
 
-        tripsBody.appendChild(tr);
+        // Coordinates container (left side)
+        const coordsDiv = document.createElement('div');
+        coordsDiv.className = 'trip-coordinates';
+
+        // From coordinates
+        const fromCoord = document.createElement('div');
+        fromCoord.className = 'trip-coord-item';
+        const fromLabel = document.createElement('span');
+        fromLabel.className = 'trip-coord-label';
+        fromLabel.textContent = 'Från:';
+        const fromValue = document.createElement('span');
+        fromValue.className = 'trip-coord-value';
+        fromValue.textContent = trip.startAddress || '—';
+        fromValue.title = trip.startAddress || '—';
+        fromCoord.appendChild(fromLabel);
+        fromCoord.appendChild(fromValue);
+        coordsDiv.appendChild(fromCoord);
+
+        // To coordinates
+        const toCoord = document.createElement('div');
+        toCoord.className = 'trip-coord-item';
+        const toLabel = document.createElement('span');
+        toLabel.className = 'trip-coord-label';
+        toLabel.textContent = 'Till:';
+        const toValue = document.createElement('span');
+        toValue.className = 'trip-coord-value';
+        toValue.textContent = trip.endAddress || '—';
+        toValue.title = trip.endAddress || '—';
+        toCoord.appendChild(toLabel);
+        toCoord.appendChild(toValue);
+        coordsDiv.appendChild(toCoord);
+
+        row2.appendChild(coordsDiv);
+
+        // Place name (right side, vertically centered)
+        const placeName = formatPlaceNames(trip);
+        if (placeName) {
+          const placeDiv = document.createElement('div');
+          placeDiv.className = 'trip-place';
+          
+          const placeTag = document.createElement('span');
+          placeTag.className = 'trip-place-tag';
+          placeTag.textContent = placeName;
+          placeTag.title = 'Klicka för att namnge placeId';
+          placeTag.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent card toggle
+            const pidToEdit = placeIdForEdit(trip);
+            if (pidToEdit) {
+              promptForPlaceName(pidToEdit);
+            }
+          });
+          placeDiv.appendChild(placeTag);
+          row2.appendChild(placeDiv);
+        }
+
+        content.appendChild(row2);
+        card.appendChild(content);
+        tripsContainer.appendChild(card);
       }
     }
 
@@ -790,17 +1053,47 @@
       }
     }
 
-    // Init jQuery UI dialog and try loading example.json när sidan öppnas
-    $(function init() {
-      placeDialog = $('#placeDialog').dialog({
-        autoOpen: false,
-        modal: true,
-        width: 400
-      });
+    // Initialize modal and try loading example.json when page loads
+    function init() {
+      placeDialogEl = document.getElementById('placeDialog');
       placeDialogInput = document.getElementById('placeDialogInput');
       placeDialogIdEl = document.getElementById('placeDialogId');
+      placeDialogSave = document.getElementById('placeDialogSave');
+      placeDialogCancel = document.getElementById('placeDialogCancel');
+
+      // Set up modal event listeners
+      if (placeDialogSave) {
+        placeDialogSave.addEventListener('click', savePlaceName);
+      }
+      if (placeDialogCancel) {
+        placeDialogCancel.addEventListener('click', closePlaceDialog);
+      }
+      if (placeDialogEl) {
+        // Close modal when clicking overlay
+        placeDialogEl.addEventListener('click', (e) => {
+          if (e.target === placeDialogEl) {
+            closePlaceDialog();
+          }
+        });
+      }
+      if (placeDialogInput) {
+        // Allow Enter key to save
+        placeDialogInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            savePlaceName();
+          }
+        });
+      }
+
       tryLoadExampleJson();
-    });
+    }
+
+    // Run init when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   </script>
 </body>
 </html>
