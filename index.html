@@ -111,14 +111,12 @@
       border: 2px solid #e9ecef;
       box-shadow: 0 1px 3px rgba(0,0,0,0.05);
       position: relative;
-      display: grid;
-      grid-template-columns: auto 1fr auto;
+      display: flex;
       gap: 0.75rem;
-      align-items: center;
+      align-items: stretch;
     }
     .trip-card:hover {
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transform: translateY(-1px);
     }
     .trip-card.selected {
       background: linear-gradient(135deg, #d4edda 0%, #e8f5e9 100%);
@@ -137,6 +135,7 @@
       justify-content: center;
       font-size: 14px;
       flex-shrink: 0;
+      align-self: center;
     }
     .trip-card.selected .trip-check-icon {
       background: #28a745;
@@ -146,90 +145,98 @@
       background: #dc3545;
       color: white;
     }
-    .trip-card-main {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 1rem;
-      align-items: center;
-      min-width: 0;
-    }
-    .trip-date-time {
+    .trip-card-content {
+      flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 0.1rem;
+      gap: 0.4rem;
+      min-width: 0;
+    }
+    .trip-row-1 {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
       font-size: 0.8rem;
-      white-space: nowrap;
     }
     .trip-date {
       font-weight: 600;
       color: #2c3e50;
       font-size: 0.85rem;
-    }
-    .trip-time-range {
-      color: #6c757d;
-      font-size: 0.75rem;
-    }
-    .trip-card-body {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0.5rem 1.5rem;
-      font-size: 0.8rem;
-      min-width: 0;
-    }
-    .trip-location-row {
-      display: flex;
-      align-items: baseline;
-      gap: 0.4rem;
-      min-width: 0;
-    }
-    .trip-location-label {
-      font-weight: 600;
-      color: #6c757d;
-      font-size: 0.75rem;
-      flex-shrink: 0;
-    }
-    .trip-location-value {
-      color: #2c3e50;
-      flex: 1;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
-    .trip-tags {
-      display: flex;
-      gap: 0.35rem;
-      flex-wrap: nowrap;
-      align-items: center;
+    .trip-time {
+      color: #6c757d;
+      font-size: 0.8rem;
+      white-space: nowrap;
     }
-    .trip-tag {
-      display: inline-block;
+    .trip-type {
+      background: #d1ecf1;
+      color: #0c5460;
       padding: 0.15rem 0.5rem;
-      background: #e9ecef;
       border-radius: 10px;
       font-size: 0.7rem;
-      color: #495057;
       font-weight: 500;
       white-space: nowrap;
     }
-    .trip-tag.type {
-      background: #d1ecf1;
-      color: #0c5460;
-    }
-    .trip-tag.distance {
+    .trip-distance {
       background: #fff3cd;
       color: #856404;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
     }
-    .trip-tag.place {
+    .trip-row-2 {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.75rem;
+    }
+    .trip-coordinates {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .trip-coord-item {
+      display: flex;
+      gap: 0.3rem;
+      align-items: baseline;
+      white-space: nowrap;
+    }
+    .trip-coord-label {
+      font-weight: 600;
+      color: #6c757d;
+    }
+    .trip-coord-value {
+      color: #2c3e50;
+    }
+    .trip-place {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .trip-place-tag {
       background: #d4edda;
       color: #155724;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      white-space: nowrap;
       cursor: pointer;
-      max-width: 200px;
+      max-width: 250px;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .trip-tag.place:hover {
+    .trip-place-tag:hover {
       background: #c3e6cb;
     }
+
     
     @media (max-width: 700px) {
       .trip-date-time {
@@ -795,7 +802,7 @@
         // Make the whole card clickable to toggle selection
         card.addEventListener('click', (e) => {
           // Don't toggle if clicking on the place tag
-          if (e.target.classList.contains('trip-tag') && e.target.classList.contains('place')) {
+          if (e.target.classList.contains('trip-place-tag')) {
             return;
           }
           trip.selected = !trip.selected;
@@ -809,86 +816,96 @@
         checkIcon.textContent = trip.selected ? '✓' : '✕';
         card.appendChild(checkIcon);
 
-        // Main content area (middle)
-        const mainContent = document.createElement('div');
-        mainContent.className = 'trip-card-main';
+        // Main content area
+        const content = document.createElement('div');
+        content.className = 'trip-card-content';
 
-        // Date/Time column
-        const dateTime = document.createElement('div');
-        dateTime.className = 'trip-date-time';
+        // Row 1: Date, start time, end time, transport mode, distance
+        const row1 = document.createElement('div');
+        row1.className = 'trip-row-1';
 
+        // Date
         const dateSpan = document.createElement('span');
         dateSpan.className = 'trip-date';
         dateSpan.textContent = trip.dateOnly;
-        dateTime.appendChild(dateSpan);
+        row1.appendChild(dateSpan);
 
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'trip-time-range';
-        timeSpan.textContent = `${trip.startTime} - ${trip.endTime}`;
-        dateTime.appendChild(timeSpan);
+        // Start time
+        const startTime = document.createElement('span');
+        startTime.className = 'trip-time';
+        startTime.textContent = trip.startTime;
+        row1.appendChild(startTime);
 
-        mainContent.appendChild(dateTime);
+        // End time
+        const endTime = document.createElement('span');
+        endTime.className = 'trip-time';
+        endTime.textContent = trip.endTime;
+        row1.appendChild(endTime);
 
-        // Body with From/To locations in 2-column grid
-        const body = document.createElement('div');
-        body.className = 'trip-card-body';
+        // Transport mode
+        if (trip.tripType) {
+          const typeSpan = document.createElement('span');
+          typeSpan.className = 'trip-type';
+          typeSpan.textContent = trip.tripType;
+          row1.appendChild(typeSpan);
+        }
 
-        // From
-        const fromRow = document.createElement('div');
-        fromRow.className = 'trip-location-row';
+        // Distance
+        if (trip.distanceKm) {
+          const distSpan = document.createElement('span');
+          distSpan.className = 'trip-distance';
+          distSpan.textContent = `${trip.distanceKm} km`;
+          row1.appendChild(distSpan);
+        }
+
+        content.appendChild(row1);
+
+        // Row 2: Coordinates (From/To) and PlaceId/Platsnamn
+        const row2 = document.createElement('div');
+        row2.className = 'trip-row-2';
+
+        // Coordinates container (left side)
+        const coordsDiv = document.createElement('div');
+        coordsDiv.className = 'trip-coordinates';
+
+        // From coordinates
+        const fromCoord = document.createElement('div');
+        fromCoord.className = 'trip-coord-item';
         const fromLabel = document.createElement('span');
-        fromLabel.className = 'trip-location-label';
+        fromLabel.className = 'trip-coord-label';
         fromLabel.textContent = 'Från:';
         const fromValue = document.createElement('span');
-        fromValue.className = 'trip-location-value';
+        fromValue.className = 'trip-coord-value';
         fromValue.textContent = trip.startAddress || '—';
         fromValue.title = trip.startAddress || '—';
-        fromRow.appendChild(fromLabel);
-        fromRow.appendChild(fromValue);
-        body.appendChild(fromRow);
+        fromCoord.appendChild(fromLabel);
+        fromCoord.appendChild(fromValue);
+        coordsDiv.appendChild(fromCoord);
 
-        // To
-        const toRow = document.createElement('div');
-        toRow.className = 'trip-location-row';
+        // To coordinates
+        const toCoord = document.createElement('div');
+        toCoord.className = 'trip-coord-item';
         const toLabel = document.createElement('span');
-        toLabel.className = 'trip-location-label';
+        toLabel.className = 'trip-coord-label';
         toLabel.textContent = 'Till:';
         const toValue = document.createElement('span');
-        toValue.className = 'trip-location-value';
+        toValue.className = 'trip-coord-value';
         toValue.textContent = trip.endAddress || '—';
         toValue.title = trip.endAddress || '—';
-        toRow.appendChild(toLabel);
-        toRow.appendChild(toValue);
-        body.appendChild(toRow);
+        toCoord.appendChild(toLabel);
+        toCoord.appendChild(toValue);
+        coordsDiv.appendChild(toCoord);
 
-        mainContent.appendChild(body);
-        card.appendChild(mainContent);
+        row2.appendChild(coordsDiv);
 
-        // Tags (right side)
-        const tagsRow = document.createElement('div');
-        tagsRow.className = 'trip-tags';
-
-        // Type tag
-        if (trip.tripType) {
-          const typeTag = document.createElement('span');
-          typeTag.className = 'trip-tag type';
-          typeTag.textContent = trip.tripType;
-          tagsRow.appendChild(typeTag);
-        }
-
-        // Distance tag
-        if (trip.distanceKm) {
-          const distTag = document.createElement('span');
-          distTag.className = 'trip-tag distance';
-          distTag.textContent = `${trip.distanceKm} km`;
-          tagsRow.appendChild(distTag);
-        }
-
-        // Place tag (clickable)
+        // Place name (right side, vertically centered)
         const placeName = formatPlaceNames(trip);
         if (placeName) {
+          const placeDiv = document.createElement('div');
+          placeDiv.className = 'trip-place';
+          
           const placeTag = document.createElement('span');
-          placeTag.className = 'trip-tag place';
+          placeTag.className = 'trip-place-tag';
           placeTag.textContent = placeName;
           placeTag.title = 'Klicka för att namnge placeId';
           placeTag.addEventListener('click', (e) => {
@@ -898,10 +915,12 @@
               promptForPlaceName(pidToEdit);
             }
           });
-          tagsRow.appendChild(placeTag);
+          placeDiv.appendChild(placeTag);
+          row2.appendChild(placeDiv);
         }
 
-        card.appendChild(tagsRow);
+        content.appendChild(row2);
+        card.appendChild(content);
         tripsContainer.appendChild(card);
       }
     }
