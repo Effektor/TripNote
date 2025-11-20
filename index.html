@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>Körjournal från Google Timeline</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -135,6 +138,8 @@
               <th>Datum</th>
               <th>Starttid</th>
               <th>Sluttid</th>
+              <th>Typ</th>
+              <th>Platsnamn</th>
               <th>Sträcka (km)</th>
               <th>Från</th>
               <th>Till</th>
@@ -148,6 +153,11 @@
     </div>
 
     <div class="log" id="log">Ingen fil vald.</div>
+  </div>
+
+  <div id="placeDialog" title="Namnge placeId" style="display:none;">
+    <div id="placeDialogId" style="font-size:0.9rem; margin-bottom:0.3rem;"></div>
+    <input type="text" id="placeDialogInput" style="width:100%; padding:0.3rem;" placeholder="Ange namn eller lämna tomt för att ta bort">
   </div>
 
   <script>
@@ -166,6 +176,11 @@
 
     let allTrips = [];      // alla resor
     let filteredTrips = []; // resor efter datumfilter
+    let placeNameMap = loadPlaceNameMap();
+    let placeDialog = null;
+    let placeDialogInput = null;
+    let placeDialogIdEl = null;
+    let visitByStartTime = {};
 
     function log(msg) {
       logEl.textContent = msg;
@@ -228,6 +243,90 @@
       };
     }
 
+    function formatLatLngForDisplay(lat, lng) {
+      return (lat && lng) ? `${lat}, ${lng}` : '';
+    }
+
+    function makeCoordKey(lat, lng) {
+      if (!lat || !lng) return '';
+      const nLat = Number(lat);
+      const nLng = Number(lng);
+      if (isNaN(nLat) || isNaN(nLng)) return '';
+      // round to 4 decimals to make close coordinates match the same place
+      return `${nLat.toFixed(4)},${nLng.toFixed(4)}`;
+    }
+
+    function loadPlaceNameMap() {
+      try {
+        const raw = localStorage.getItem('tripnote_place_map');
+        return raw ? JSON.parse(raw) : {};
+      } catch (e) {
+        console.warn('Could not read place map from storage', e);
+        return {};
+      }
+    }
+
+    function savePlaceNameMap() {
+      try {
+        localStorage.setItem('tripnote_place_map', JSON.stringify(placeNameMap));
+      } catch (e) {
+        console.warn('Could not save place map', e);
+      }
+    }
+
+    function applyPlaceNamesToTrips() {
+      for (const t of allTrips) {
+        if (t.startPlaceId) {
+          const name = placeNameMap[t.startPlaceId];
+          t.startAddress = name || t.startAddressBase;
+        }
+        if (t.endPlaceId) {
+          const name = placeNameMap[t.endPlaceId];
+          t.endAddress = name || t.endAddressBase;
+        }
+      }
+    }
+
+    function displayNameForPlace(placeId, fallback) {
+      if (!placeId) return fallback || '';
+      const mapped = placeNameMap[placeId];
+      return mapped || placeId || fallback || '';
+    }
+
+    function formatPlaceNames(trip) {
+      const name = displayNameForPlace(trip.placeIdAfter, '');
+      const semantic = trip.placeSemanticType ? ` (${trip.placeSemanticType})` : '';
+      return name ? `${name}${semantic}` : '';
+    }
+
+    function placeIdForEdit(trip) {
+      if (trip.placeIdAfter && !placeNameMap[trip.placeIdAfter]) return trip.placeIdAfter;
+      return trip.placeIdAfter || '';
+    }
+
+    function promptForPlaceName(placeId) {
+      if (!placeId || !placeDialog) return;
+      placeDialogIdEl.textContent = placeId;
+      placeDialogInput.value = placeNameMap[placeId] || '';
+      placeDialog.dialog('option', 'buttons', {
+        Spara: () => {
+          const trimmed = placeDialogInput.value.trim();
+          if (trimmed) {
+            placeNameMap[placeId] = trimmed;
+          } else {
+            delete placeNameMap[placeId];
+          }
+          savePlaceNameMap();
+          applyPlaceNamesToTrips();
+          renderTripsTable();
+          updateSummary();
+          placeDialog.dialog('close');
+        },
+        Avbryt: () => placeDialog.dialog('close')
+      });
+      placeDialog.dialog('open');
+    }
+
     console.log('Init app ready');
 
     fileInput.addEventListener('change', () => {
@@ -276,12 +375,30 @@
       console.log('Raw data keys', Object.keys(data || {}));
 
       allTrips = [];
+      visitByStartTime = {};
       let idCounter = 0;
 
       const semanticSegments = Array.isArray(data.semanticSegments) ? data.semanticSegments : null;
 
       if (semanticSegments) {
         console.log('Found semanticSegments', semanticSegments.length);
+
+        // Först: bygg upp lookup för visit-segment: startTime => { placeId, semanticType, coords }
+        for (const segment of semanticSegments) {
+          const visit = segment.visit && segment.visit.topCandidate;
+          if (!visit) continue;
+          const placeId = visit.placeId;
+          const placeLoc = visit.placeLocation && visit.placeLocation.latLng;
+          const coords = parseLatLngString(placeLoc);
+          const semanticType = visit.semanticType || '';
+          if (placeId && segment.startTime) {
+            visitByStartTime[segment.startTime] = {
+              placeId,
+              semanticType,
+              coords
+            };
+          }
+        }
 
         for (const segment of semanticSegments) {
           const activity = segment.activity;
@@ -305,6 +422,26 @@
 
           const startCoords = parseLatLngString(activity.start && activity.start.latLng);
           const endCoords = parseLatLngString(activity.end && activity.end.latLng);
+          const tripType =
+            (activity.topCandidate && activity.topCandidate.type) ||
+            activity.activityType ||
+            '';
+          let startPlaceId =
+            (activity.start && activity.start.placeId) ||
+            (activity.start && activity.start.topCandidate && activity.start.topCandidate.placeId) ||
+            '';
+          let endPlaceId =
+            (activity.end && activity.end.placeId) ||
+            (activity.end && activity.end.topCandidate && activity.end.topCandidate.placeId) ||
+            '';
+          const followingVisit = visitByStartTime[endTs];
+          const placeIdAfter = (followingVisit && followingVisit.placeId) || '';
+          const semanticTypeAfter = (followingVisit && followingVisit.semanticType) || '';
+
+          const startAddressBase = formatLatLngForDisplay(startCoords.lat, startCoords.lng);
+          const endAddressBase = formatLatLngForDisplay(endCoords.lat, endCoords.lng);
+          const startAddress = startPlaceId && placeNameMap[startPlaceId] ? placeNameMap[startPlaceId] : startAddressBase;
+          const endAddress = endPlaceId && placeNameMap[endPlaceId] ? placeNameMap[endPlaceId] : endAddressBase;
 
           const trip = {
             id: idCounter++,
@@ -318,8 +455,15 @@
             startLng: startCoords.lng,
             endLat: endCoords.lat,
             endLng: endCoords.lng,
-            startAddress: '',
-            endAddress: '',
+            startPlaceId: startPlaceId,
+            endPlaceId: endPlaceId,
+            placeIdAfter: placeIdAfter,
+            placeSemanticType: semanticTypeAfter,
+            startAddressBase: startAddressBase,
+            endAddressBase: endAddressBase,
+            startAddress: startAddress,
+            endAddress: endAddress,
+            tripType: tripType,
             selected: true
           };
 
@@ -353,6 +497,21 @@
 
             const startLoc = activity.startLocation || {};
             const endLoc = activity.endLocation || {};
+            const tripType =
+              activity.activityType ||
+              (Array.isArray(activity.activities) && activity.activities[0] && activity.activities[0].activityType) ||
+              '';
+            const startLat = coordToDeg(startLoc.latitudeE7);
+            const startLng = coordToDeg(startLoc.longitudeE7);
+            const endLat = coordToDeg(endLoc.latitudeE7);
+            const endLng = coordToDeg(endLoc.longitudeE7);
+            const startPlaceId = startLoc.placeId || '';
+            const endPlaceId = endLoc.placeId || '';
+
+            const startAddrBase = startLoc.address || formatLatLngForDisplay(startLat, startLng);
+            const endAddrBase = endLoc.address || formatLatLngForDisplay(endLat, endLng);
+            const startAddr = startPlaceId && placeNameMap[startPlaceId] ? placeNameMap[startPlaceId] : startAddrBase;
+            const endAddr = endPlaceId && placeNameMap[endPlaceId] ? placeNameMap[endPlaceId] : endAddrBase;
 
             const trip = {
               id: idCounter++,
@@ -362,12 +521,17 @@
               startTime: startTime,
               endTime: endTime,
               distanceKm: distanceKm,
-              startLat: coordToDeg(startLoc.latitudeE7),
-              startLng: coordToDeg(startLoc.longitudeE7),
-              endLat: coordToDeg(endLoc.latitudeE7),
-              endLng: coordToDeg(endLoc.longitudeE7),
-              startAddress: startLoc.address || '',
-              endAddress: endLoc.address || '',
+              startLat: startLat,
+              startLng: startLng,
+              endLat: endLat,
+              endLng: endLng,
+              startPlaceId: startPlaceId,
+              endPlaceId: endPlaceId,
+              startAddressBase: startAddrBase,
+              endAddressBase: endAddrBase,
+              startAddress: startAddr,
+              endAddress: endAddr,
+              tripType: tripType,
               selected: true // default: allt markerat
             };
 
@@ -385,6 +549,7 @@
         return;
       }
 
+      applyPlaceNamesToTrips();
       controls.style.display = 'block';
 
       // sätt datumfilter automatiskt till min/max datum
@@ -458,6 +623,24 @@
         tdEnd.className = 'small';
         tdEnd.textContent = trip.endTime;
         tr.appendChild(tdEnd);
+
+        // trip type
+        const tdType = document.createElement('td');
+        tdType.className = 'small';
+        tdType.textContent = trip.tripType || '';
+        tr.appendChild(tdType);
+
+        // place names
+        const tdPlace = document.createElement('td');
+        tdPlace.className = 'small';
+        tdPlace.textContent = formatPlaceNames(trip);
+        if (trip.placeIdAfter) {
+          tdPlace.style.cursor = 'pointer';
+          tdPlace.title = 'Klicka för att namnge placeId';
+          const pidToEdit = placeIdForEdit(trip);
+          tdPlace.addEventListener('click', () => promptForPlaceName(pidToEdit));
+        }
+        tr.appendChild(tdPlace);
 
         // distance
         const tdDist = document.createElement('td');
@@ -593,6 +776,31 @@
 
       URL.revokeObjectURL(url);
     }
+
+    async function tryLoadExampleJson() {
+      try {
+        const res = await fetch('example.json', { cache: 'no-store' });
+        if (!res.ok) return; // quietly ignore missing example.json
+        const text = await res.text();
+        const data = JSON.parse(text);
+        loadTripsFromData(data);
+        log('Fil laddad: example.json');
+      } catch (e) {
+        console.log('Ingen example.json att ladda vid start.', e);
+      }
+    }
+
+    // Init jQuery UI dialog and try loading example.json när sidan öppnas
+    $(function init() {
+      placeDialog = $('#placeDialog').dialog({
+        autoOpen: false,
+        modal: true,
+        width: 400
+      });
+      placeDialogInput = document.getElementById('placeDialogInput');
+      placeDialogIdEl = document.getElementById('placeDialogId');
+      tryLoadExampleJson();
+    });
   </script>
 </body>
 </html>
