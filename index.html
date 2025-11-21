@@ -974,6 +974,13 @@
       applyFilter();
     }
 
+    function isWithinTimeFilter(trip, from, to) {
+      if (!trip.dateOnly) return false;
+      if (from && trip.dateOnly < from) return false;
+      if (to && trip.dateOnly > to) return false;
+      return true;
+    }
+
     function populateDestinationDropdown() {
       // Collect unique destinations from time-filtered trips only
       const from = fromDateInput.value;
@@ -982,9 +989,7 @@
       const destinations = new Map();
       for (const trip of allTrips) {
         // Apply time filter to determine which destinations to show
-        if (!trip.dateOnly) continue;
-        if (from && trip.dateOnly < from) continue;
-        if (to && trip.dateOnly > to) continue;
+        if (!isWithinTimeFilter(trip, from, to)) continue;
         
         if (trip.placeIdAfter) {
           const displayName = displayNameForPlace(trip.placeIdAfter, trip.placeIdAfter);
@@ -1097,9 +1102,7 @@
 
       filteredTrips = allTrips.filter(t => {
         // Date filter
-        if (!t.dateOnly) return false;
-        if (from && t.dateOnly < from) return false;
-        if (to && t.dateOnly > to) return false;
+        if (!isWithinTimeFilter(t, from, to)) return false;
         
         // Destination filter
         if (selectedDestinations.size > 0) {
