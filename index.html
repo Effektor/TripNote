@@ -425,7 +425,7 @@
         <div class="filter-group">
           <label>Avstånd (km)</label>
           <div class="distance-filter-group">
-            <select id="distanceOperator">
+            <select id="distanceOperator" aria-label="Avståndsoperator">
               <option value="">Alla</option>
               <option value="gt">></option>
               <option value="lt"><</option>
@@ -791,6 +791,7 @@
             activity.distanceMeters !== undefined && activity.distanceMeters !== null
               ? activity.distanceMeters
               : activity.distance;
+          // Round distance down to 1 decimal place (multiply by 10, floor, divide by 10)
           const distanceKm =
             (distanceM !== undefined && distanceM !== null)
               ? Math.floor((Number(distanceM) / 1000) * 10) / 10
@@ -866,6 +867,7 @@
             const endTime = parseTimeOnlyFromIso(endTs);
 
             const distanceM = activity.distance;
+            // Round distance down to 1 decimal place (multiply by 10, floor, divide by 10)
             const distanceKm =
               (distanceM !== undefined && distanceM !== null)
                 ? Math.floor((distanceM / 1000) * 10) / 10
@@ -980,7 +982,8 @@
       selectAllItem.appendChild(selectAllCheckbox);
       selectAllItem.appendChild(selectAllLabel);
       selectAllItem.addEventListener('click', (e) => {
-        if (e.target === selectAllLabel || e.target === selectAllItem) {
+        // Don't toggle manually if checkbox was clicked directly (it will toggle automatically)
+        if (e.target !== selectAllCheckbox && (e.target === selectAllLabel || e.target === selectAllItem)) {
           selectAllCheckbox.checked = !selectAllCheckbox.checked;
         }
         if (selectAllCheckbox.checked) {
@@ -1019,7 +1022,8 @@
         item.appendChild(label);
         
         item.addEventListener('click', (e) => {
-          if (e.target === label || e.target === item) {
+          // Don't toggle manually if checkbox was clicked directly (it will toggle automatically)
+          if (e.target !== checkbox && (e.target === label || e.target === item)) {
             checkbox.checked = !checkbox.checked;
           }
           if (checkbox.checked) {
@@ -1073,7 +1077,8 @@
         
         // Distance filter
         if (distOp && distVal !== null) {
-          const tripDist = t.distanceKm ? parseFloat(String(t.distanceKm).replace(',', '.')) : 0;
+          // distanceKm is now always a number after our formatting changes
+          const tripDist = t.distanceKm ? (typeof t.distanceKm === 'number' ? t.distanceKm : Number(t.distanceKm)) : 0;
           if (distOp === 'gt' && tripDist <= distVal) return false;
           if (distOp === 'lt' && tripDist >= distVal) return false;
         }
@@ -1233,7 +1238,8 @@
       let totalDistSelected = 0;
       for (const t of allTrips) {
         if (t.selected && t.distanceKm) {
-          const n = typeof t.distanceKm === 'number' ? t.distanceKm : Number(String(t.distanceKm).replace(',', '.'));
+          // distanceKm is now always a number after our formatting changes
+          const n = typeof t.distanceKm === 'number' ? t.distanceKm : Number(t.distanceKm);
           if (!isNaN(n)) totalDistSelected += n;
         }
       }
