@@ -79,9 +79,14 @@
     }
     .filters {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 0.75rem;
       margin-top: 0.5rem;
+    }
+    .filters-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
       align-items: flex-end;
     }
     .filters > div {
@@ -112,7 +117,8 @@
     /* Dropdown multi-select styles */
     .dropdown-container {
       position: relative;
-      min-width: 200px;
+      min-width: 300px;
+      max-width: 450px;
     }
     .dropdown-toggle {
       padding: 0.5rem;
@@ -402,46 +408,52 @@
 
     <div id="controls" style="display:none;">
       <div class="filters">
-        <div>
-          <label for="fromDate">Från datum</label>
-          <input type="date" id="fromDate">
-        </div>
-        <div>
-          <label for="toDate">Till datum</label>
-          <input type="date" id="toDate">
-        </div>
-        <div class="filter-group">
-          <label>Destination</label>
-          <div class="dropdown-container">
-            <div class="dropdown-toggle" id="destinationDropdownToggle" role="button" tabindex="0" aria-expanded="false" aria-haspopup="menu">
-              <span id="destinationDropdownLabel">Alla destinationer</span>
-              <span class="dropdown-arrow">▼</span>
-            </div>
-            <div class="dropdown-menu" id="destinationDropdownMenu" role="menu" aria-label="Destinationsfilter">
-              <!-- Destination checkboxes will be populated here -->
-            </div>
+        <!-- Time filters row (applies automatically) -->
+        <div class="filters-row">
+          <div>
+            <label for="fromDate">Från datum</label>
+            <input type="date" id="fromDate">
+          </div>
+          <div>
+            <label for="toDate">Till datum</label>
+            <input type="date" id="toDate">
           </div>
         </div>
-        <div class="filter-group">
-          <label>Avstånd (km)</label>
-          <div class="distance-filter-group">
-            <select id="distanceOperator" aria-label="Avståndsoperator">
-              <option value="">Alla</option>
-              <option value="gt">></option>
-              <option value="lt"><</option>
-            </select>
-            <input type="number" id="distanceValue" placeholder="km" step="0.1" min="0" aria-label="Avståndsvärde">
+        <!-- Other filters row -->
+        <div class="filters-row">
+          <div class="filter-group">
+            <label>Destination</label>
+            <div class="dropdown-container">
+              <div class="dropdown-toggle" id="destinationDropdownToggle" role="button" tabindex="0" aria-expanded="false" aria-haspopup="menu">
+                <span id="destinationDropdownLabel">Alla destinationer</span>
+                <span class="dropdown-arrow">▼</span>
+              </div>
+              <div class="dropdown-menu" id="destinationDropdownMenu" role="menu" aria-label="Destinationsfilter">
+                <!-- Destination checkboxes will be populated here -->
+              </div>
+            </div>
           </div>
-        </div>
-        <div>
-          <button id="applyFilterBtn">Filtrera</button>
-        </div>
-        <div>
-          <button id="selectVisibleBtn">Markera synliga</button>
-          <button id="clearVisibleBtn">Avmarkera synliga</button>
-        </div>
-        <div>
-          <button id="exportBtn">Exportera valda till CSV</button>
+          <div class="filter-group">
+            <label>Avstånd (km)</label>
+            <div class="distance-filter-group">
+              <select id="distanceOperator" aria-label="Avståndsoperator">
+                <option value="">Alla</option>
+                <option value="gt">></option>
+                <option value="lt"><</option>
+              </select>
+              <input type="number" id="distanceValue" placeholder="km" step="0.1" min="0" aria-label="Avståndsvärde">
+            </div>
+          </div>
+          <div>
+            <button id="applyFilterBtn">Filtrera</button>
+          </div>
+          <div>
+            <button id="selectVisibleBtn">Markera synliga</button>
+            <button id="clearVisibleBtn">Avmarkera synliga</button>
+          </div>
+          <div>
+            <button id="exportBtn">Exportera valda till CSV</button>
+          </div>
         </div>
       </div>
 
@@ -963,9 +975,17 @@
     }
 
     function populateDestinationDropdown() {
-      // Collect all unique destinations
+      // Collect unique destinations from time-filtered trips only
+      const from = fromDateInput.value;
+      const to = toDateInput.value;
+      
       const destinations = new Map();
       for (const trip of allTrips) {
+        // Apply time filter to determine which destinations to show
+        if (!trip.dateOnly) continue;
+        if (from && trip.dateOnly < from) continue;
+        if (to && trip.dateOnly > to) continue;
+        
         if (trip.placeIdAfter) {
           const displayName = displayNameForPlace(trip.placeIdAfter, trip.placeIdAfter);
           destinations.set(trip.placeIdAfter, displayName);
@@ -1284,6 +1304,19 @@
         destinationDropdownMenu.classList.remove('active');
         destinationDropdownToggle.setAttribute('aria-expanded', 'false');
       }
+    });
+
+    // Auto-apply time filter when date inputs change
+    fromDateInput.addEventListener('change', () => {
+      selectedDestinations.clear(); // Clear destination selection when time filter changes
+      populateDestinationDropdown(); // Refresh destinations based on new time filter
+      applyFilter();
+    });
+    
+    toDateInput.addEventListener('change', () => {
+      selectedDestinations.clear(); // Clear destination selection when time filter changes
+      populateDestinationDropdown(); // Refresh destinations based on new time filter
+      applyFilter();
     });
 
     applyFilterBtn.addEventListener('click', () => {
