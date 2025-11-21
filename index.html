@@ -413,11 +413,11 @@
         <div class="filter-group">
           <label>Destination</label>
           <div class="dropdown-container">
-            <div class="dropdown-toggle" id="destinationDropdownToggle" role="button" tabindex="0" aria-expanded="false" aria-haspopup="listbox">
+            <div class="dropdown-toggle" id="destinationDropdownToggle" role="button" tabindex="0" aria-expanded="false" aria-haspopup="menu">
               <span id="destinationDropdownLabel">Alla destinationer</span>
               <span class="dropdown-arrow">▼</span>
             </div>
-            <div class="dropdown-menu" id="destinationDropdownMenu" role="listbox">
+            <div class="dropdown-menu" id="destinationDropdownMenu" role="menu" aria-label="Destinationsfilter">
               <!-- Destination checkboxes will be populated here -->
             </div>
           </div>
@@ -980,12 +980,13 @@
       // Clear existing items
       destinationDropdownMenu.innerHTML = '';
 
-      // Add "Select All" option
+      // Add "Show All" option (when checked, no destination filter is applied)
       const selectAllItem = document.createElement('div');
       selectAllItem.className = 'dropdown-item';
       const selectAllCheckbox = document.createElement('input');
       selectAllCheckbox.type = 'checkbox';
       selectAllCheckbox.id = 'destination-select-all';
+      // Checked when no specific destinations are selected (i.e., showing all)
       selectAllCheckbox.checked = selectedDestinations.size === 0;
       const selectAllLabel = document.createElement('label');
       selectAllLabel.htmlFor = 'destination-select-all';
@@ -998,6 +999,7 @@
           selectAllCheckbox.checked = !selectAllCheckbox.checked;
         }
         if (selectAllCheckbox.checked) {
+          // Clear selection to show all destinations (no filter)
           selectedDestinations.clear();
           // Uncheck all other checkboxes
           const checkboxes = destinationDropdownMenu.querySelectorAll('input[type="checkbox"]:not(#destination-select-all)');
