@@ -1307,17 +1307,14 @@
     });
 
     // Auto-apply time filter when date inputs change
-    fromDateInput.addEventListener('change', () => {
+    function handleTimeFilterChange() {
       selectedDestinations.clear(); // Clear destination selection when time filter changes
       populateDestinationDropdown(); // Refresh destinations based on new time filter
       applyFilter();
-    });
+    }
     
-    toDateInput.addEventListener('change', () => {
-      selectedDestinations.clear(); // Clear destination selection when time filter changes
-      populateDestinationDropdown(); // Refresh destinations based on new time filter
-      applyFilter();
-    });
+    fromDateInput.addEventListener('change', handleTimeFilterChange);
+    toDateInput.addEventListener('change', handleTimeFilterChange);
 
     applyFilterBtn.addEventListener('click', () => {
       applyFilter();
