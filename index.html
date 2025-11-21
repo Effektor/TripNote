@@ -413,11 +413,11 @@
         <div class="filter-group">
           <label>Destination</label>
           <div class="dropdown-container">
-            <div class="dropdown-toggle" id="destinationDropdownToggle">
+            <div class="dropdown-toggle" id="destinationDropdownToggle" role="button" tabindex="0" aria-expanded="false" aria-haspopup="listbox">
               <span id="destinationDropdownLabel">Alla destinationer</span>
               <span class="dropdown-arrow">▼</span>
             </div>
-            <div class="dropdown-menu" id="destinationDropdownMenu">
+            <div class="dropdown-menu" id="destinationDropdownMenu" role="listbox">
               <!-- Destination checkboxes will be populated here -->
             </div>
           </div>
@@ -430,7 +430,7 @@
               <option value="gt">></option>
               <option value="lt"><</option>
             </select>
-            <input type="number" id="distanceValue" placeholder="km" step="0.1" min="0">
+            <input type="number" id="distanceValue" placeholder="km" step="0.1" min="0" aria-label="Avståndsvärde">
           </div>
         </div>
         <div>
@@ -503,6 +503,17 @@
     function log(msg) {
       logEl.textContent = msg;
       console.log(msg);
+    }
+
+    // Helper function to determine if checkbox should be manually toggled
+    function shouldToggleCheckbox(event, checkbox) {
+      return event.target !== checkbox;
+    }
+
+    // Helper function to get numeric distance value
+    function getNumericDistance(distanceKm) {
+      if (!distanceKm) return 0;
+      return typeof distanceKm === 'number' ? distanceKm : Number(distanceKm);
     }
 
     function toIsoString(timestamp, timestampMs) {
@@ -983,7 +994,7 @@
       selectAllItem.appendChild(selectAllLabel);
       selectAllItem.addEventListener('click', (e) => {
         // Don't toggle manually if checkbox was clicked directly (it will toggle automatically)
-        if (e.target !== selectAllCheckbox && (e.target === selectAllLabel || e.target === selectAllItem)) {
+        if (shouldToggleCheckbox(e, selectAllCheckbox)) {
           selectAllCheckbox.checked = !selectAllCheckbox.checked;
         }
         if (selectAllCheckbox.checked) {
@@ -1023,7 +1034,7 @@
         
         item.addEventListener('click', (e) => {
           // Don't toggle manually if checkbox was clicked directly (it will toggle automatically)
-          if (e.target !== checkbox && (e.target === label || e.target === item)) {
+          if (shouldToggleCheckbox(e, checkbox)) {
             checkbox.checked = !checkbox.checked;
           }
           if (checkbox.checked) {
@@ -1077,8 +1088,7 @@
         
         // Distance filter
         if (distOp && distVal !== null) {
-          // distanceKm is now always a number after our formatting changes
-          const tripDist = t.distanceKm ? (typeof t.distanceKm === 'number' ? t.distanceKm : Number(t.distanceKm)) : 0;
+          const tripDist = getNumericDistance(t.distanceKm);
           if (distOp === 'gt' && tripDist <= distVal) return false;
           if (distOp === 'lt' && tripDist >= distVal) return false;
         }
@@ -1238,8 +1248,7 @@
       let totalDistSelected = 0;
       for (const t of allTrips) {
         if (t.selected && t.distanceKm) {
-          // distanceKm is now always a number after our formatting changes
-          const n = typeof t.distanceKm === 'number' ? t.distanceKm : Number(t.distanceKm);
+          const n = getNumericDistance(t.distanceKm);
           if (!isNaN(n)) totalDistSelected += n;
         }
       }
@@ -1253,15 +1262,25 @@
     }
 
     // Destination dropdown toggle
-    destinationDropdownToggle.addEventListener('click', (e) => {
+    function toggleDropdown(e) {
       e.stopPropagation();
-      destinationDropdownMenu.classList.toggle('active');
+      const isOpen = destinationDropdownMenu.classList.toggle('active');
+      destinationDropdownToggle.setAttribute('aria-expanded', isOpen);
+    }
+    
+    destinationDropdownToggle.addEventListener('click', toggleDropdown);
+    destinationDropdownToggle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggleDropdown(e);
+      }
     });
 
     // Close dropdown when clicking outside
     document.addEventListener('click', (e) => {
       if (!destinationDropdownToggle.contains(e.target) && !destinationDropdownMenu.contains(e.target)) {
         destinationDropdownMenu.classList.remove('active');
+        destinationDropdownToggle.setAttribute('aria-expanded', 'false');
       }
     });
 
